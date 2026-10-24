@@ -1,0 +1,2 @@
+{"task_id": "Fixture/0", "prompt": "def add(a, b):\n    \"\"\"Return a + b.\"\"\"\n", "test": "def check(f):\n    assert f(1, 2) == 3\n    assert f(-1, 1) == 0\n", "entry_point": "add"}
+{"task_id": "Fixture/1", "prompt": "def is_even(n):\n    \"\"\"Return True if n is even.\"\"\"\n", "test": "def check(f):\n    assert f(2)\n    assert not f(3)\n", "entry_point": "is_even"}
