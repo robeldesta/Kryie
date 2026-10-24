@@ -58,19 +58,41 @@ Fully offline, any folder of `.py` files works as a source, e.g.
 Override any setting on the command line: `--batch_size 8 --max_steps 2000 --lr 1e-3`.
 Training resumes from `runs/<name>/ckpt.pt` automatically; pass `--resume false` to start over.
 
-## On a DigitalOcean GPU Droplet
+## On DigitalOcean
+
+Data prep needs a fast network and CPUs but no GPU, so do it on a cheap CPU
+droplet and only rent a GPU droplet for training. Keep everything on a
+DigitalOcean **Volume** (in the same region as your GPU droplets) so the data
+moves between droplets by detaching and re-attaching the volume.
+
+**1. Data prep on a CPU droplet** (8+ vCPUs, 16+ GB RAM; a 100 GB volume holds 10B tokens with room to spare)
 
 ```bash
-pip install -e .
-python -m kyrie.tokenizer --out tokenizer/kyrie.json --chars 1B
-python -m kyrie.data --tokenizer tokenizer/kyrie.json --out data/shards --tokens 10B
-python -m kyrie.train --preset base --data_dir data/shards              # 1x H100
-torchrun --nproc_per_node=8 -m kyrie.train --preset base --grad_accum 1 # 8x H100
+git clone https://github.com/robeldesta/Kryie.git kyrie && cd kyrie
+bash scripts/droplet_setup.sh /mnt/<your_volume>
+source .venv/bin/activate
+tmux new -s prep 'bash scripts/prepare_data.sh 2>&1 | tee prep.log'   # 300M-char tokenizer + 10B tokens
+```
+
+`TOKENS=2B bash scripts/prepare_data.sh` makes a quicker first pass. If the
+source runs out before the target, `meta.json` records how many tokens it really
+got; training just samples the data more than once.
+
+**2. Training on a GPU droplet.** Power off the CPU droplet, detach the volume, create the GPU droplet in the same region, attach the volume, then:
+
+```bash
+git clone https://github.com/robeldesta/Kryie.git kyrie && cd kyrie
+bash scripts/droplet_setup.sh /mnt/<your_volume>
+source .venv/bin/activate
+python -m kyrie.train --preset base --max_steps 200 --out_dir runs/base-test   # short check: speed and loss
+tmux new -s train 'python -m kyrie.train --preset base 2>&1 | tee runs/base.log'   # 1x H100
+torchrun --nproc_per_node=8 -m kyrie.train --preset base --grad_accum 1             # 8x H100
 ```
 
 The `base` preset uses ~524k tokens per step, so 19k steps is ~10B tokens.
-Reuse the tokenizer from your Mac rather than retraining it, so checkpoints stay
-compatible.
+Checkpoints are saved every 1000 steps and runs resume automatically, so a
+droplet can be destroyed and recreated without losing more than that. Destroy
+GPU droplets as soon as a run finishes: they bill while powered off.
 
 ## Data sources
 
