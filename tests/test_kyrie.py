@@ -6,6 +6,7 @@ import numpy as np
 import torch
 
 from kyrie.config import ModelConfig, PRESETS, parse_config
+from kyrie.device import pick_dtype
 from kyrie.eval.humaneval import check, load_problems, pass_at_k, truncate
 from kyrie.model import GPT
 from kyrie.sources import ExactDedup, keep_code
@@ -94,3 +95,12 @@ def test_humaneval_harness():
     assert truncate("    return 1\ndef other():\n    pass") == "    return 1"
     assert pass_at_k(10, 0, 1) == 0.0 and pass_at_k(10, 10, 1) == 1.0
     assert abs(pass_at_k(10, 5, 1) - 0.5) < 1e-9
+
+
+def test_cuda_dtype_follows_compute_capability(monkeypatch):
+    cuda = torch.device("cuda")
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (7, 5))  # T4
+    assert pick_dtype(cuda) == torch.float16
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (8, 0))  # A100
+    assert pick_dtype(cuda) == torch.bfloat16
+    assert pick_dtype(cuda, "float32") == torch.float32
