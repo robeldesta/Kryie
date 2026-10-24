@@ -21,7 +21,11 @@ def pick_dtype(device: torch.device, requested: str = "auto") -> torch.dtype:
     if requested != "auto":
         return getattr(torch, requested)
     if device.type == "cuda":
-        return torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        # Native bf16 needs Ampere (sm80) or newer. Older GPUs such as the T4
+        # (sm75) can report bf16 as "supported" through slow emulation, so
+        # check the compute capability and fall back to fp16 + loss scaling.
+        major, _ = torch.cuda.get_device_capability(device)
+        return torch.bfloat16 if major >= 8 else torch.float16
     if device.type == "mps":
         # fp32 is the stable default on MPS. Try --dtype bfloat16 on macOS 14+ for speed.
         return torch.float32
