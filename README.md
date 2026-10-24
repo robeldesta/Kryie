@@ -24,13 +24,15 @@ The same code runs on an Apple Silicon Mac (MPS), on CPU, and on NVIDIA GPUs
 | Preset | Params (non-embedding) | Context | Where |
 | --- | --- | --- | --- |
 | `tiny` | ~0.8M | 256 | Smoke test, a few minutes anywhere |
-| `small` | ~14M | 512 | A Mac overnight |
+| `small` | ~14M | 512 | An Apple Silicon Mac overnight (too slow on Intel CPU) |
 | `base` | ~75M (~100M with embeddings) | 2048 | One H100, ~10B tokens |
 
 ## Quickstart on a Mac
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
+# Intel Macs only: PyTorch 2.2.2 is the last build, on Python <= 3.12, and needs numpy < 2
+# pip install "torch==2.2.2" "numpy<2"
 pip install -e ".[dev]"
 pytest -q                                   # unit tests, CPU only, ~30s
 
