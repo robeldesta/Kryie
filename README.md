@@ -30,9 +30,10 @@ The same code runs on an Apple Silicon Mac (MPS), on CPU, and on NVIDIA GPUs
 ## Quickstart on a Mac
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-# Intel Macs only: PyTorch 2.2.2 is the last build, on Python <= 3.12, and needs numpy < 2
-# pip install "torch==2.2.2" "numpy<2"
+python3 -m venv .venv && source .venv/bin/activate   # or: conda create -n kyrie python=3.11
+# Intel Macs only: PyTorch 2.2.2 is the last build (Python <= 3.12) and needs numpy 1.x,
+# so pin the libraries that would otherwise pull in numpy 2:
+# pip install "torch==2.2.2" "numpy<2" "pyarrow<17" "datasets<3"
 pip install -e ".[dev]"
 pytest -q                                   # unit tests, CPU only, ~30s
 
