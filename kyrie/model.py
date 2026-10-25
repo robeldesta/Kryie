@@ -173,16 +173,20 @@ class GPT(nn.Module):
         fused = device_type == "cuda"
         return torch.optim.AdamW(groups, lr=lr, betas=betas, fused=fused)
 
-    @torch.no_grad()
     def generate(self, idx, max_new_tokens, temperature=0.8, top_k=50, top_p=0.95,
                  stop_ids: set[int] | None = None):
-        """Sample with a KV cache. idx: (1, T) prompt tokens."""
+        """Sample with a KV cache. idx: (1, T) prompt tokens. Returns new token ids."""
+        return list(self.generate_stream(idx, max_new_tokens, temperature, top_k, top_p, stop_ids))
+
+    @torch.no_grad()
+    def generate_stream(self, idx, max_new_tokens, temperature=0.8, top_k=50, top_p=0.95,
+                        stop_ids: set[int] | None = None):
+        """Like generate, but yields each new token id as soon as it is sampled."""
         self.eval()
         caches = [{} for _ in self.blocks]
         prompt = idx[:, -(self.cfg.seq_len - 1):]
         logits, _ = self(prompt, kv_caches=caches, start_pos=0)
         pos = prompt.size(1)
-        out = []
         for _ in range(max_new_tokens):
             if pos >= self.cfg.seq_len:
                 break
@@ -203,9 +207,8 @@ class GPT(nn.Module):
                     probs = probs / probs.sum(-1, keepdim=True)
                 nxt = torch.multinomial(probs, 1)
             tok = nxt.item()
-            out.append(tok)
+            yield tok
             if stop_ids and tok in stop_ids:
                 break
             logits, _ = self(nxt, kv_caches=caches, start_pos=pos)
             pos += 1
-        return out

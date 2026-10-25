@@ -20,3 +20,6 @@ wandb = ["wandb"]
 
 [tool.setuptools.packages.find]
 include = ["kyrie*"]
+
+[tool.setuptools.package-data]
+kyrie = ["web/*.html"]
