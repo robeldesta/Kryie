@@ -94,3 +94,18 @@ def test_humaneval_harness():
     assert truncate("    return 1\ndef other():\n    pass") == "    return 1"
     assert pass_at_k(10, 0, 1) == 0.0 and pass_at_k(10, 10, 1) == 1.0
     assert abs(pass_at_k(10, 5, 1) - 0.5) < 1e-9
+
+
+def test_web_training_job_rejects_bad_input(tmp_path):
+    import pytest
+    from kyrie.web.server import TrainingJob
+
+    (tmp_path / "data" / "shards").mkdir(parents=True)
+    job = TrainingJob(str(tmp_path))
+    for args in [("tiny", "../escape", 10, "data/shards"),
+                 ("huge", "ok", 10, "data/shards"),
+                 ("tiny", "ok", 0, "data/shards"),
+                 ("tiny", "ok", 10, "../../etc")]:
+        with pytest.raises(ValueError):
+            job.start(*args)
+    assert job.proc is None

@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyrie</title>
+<style>
+  :root {
+    --bg: #f7f6f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #e3e1da;
+    --accent: #2f6f5e; --accent-ink: #ffffff; --prompt: #8a8880; --warn: #a1452c;
+    --chip1: #e6f0ec; --chip2: #f3eadb; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151614; --panel: #1e1f1c; --ink: #ecebe6; --muted: #9b9a93; --line: #34352f;
+      --accent: #6cbfa6; --accent-ink: #10201b; --prompt: #85847c; --warn: #e28a6e;
+      --chip1: #233830; --chip2: #3a3224;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: baseline; gap: 16px; padding: 18px 24px 0; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: .5px; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  nav { display: flex; gap: 4px; padding: 12px 24px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  nav button { background: none; border: 0; padding: 10px 14px; font: inherit; color: var(--muted);
+               border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+  nav button.on { color: var(--ink); border-bottom-color: var(--accent); }
+  main { padding: 20px 24px 40px; max-width: 1100px; }
+  section { display: none; } section.on { display: block; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  select, input, textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+                            border-radius: 6px; padding: 7px 9px; }
+  textarea { width: 100%; font-family: var(--mono); font-size: 14px; resize: vertical; }
+  input[type=range] { padding: 0; }
+  button.act { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px;
+               padding: 8px 16px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.act.ghost { background: none; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: default; }
+  pre.out { font-family: var(--mono); font-size: 14px; white-space: pre-wrap; word-break: break-word;
+            margin: 0; min-height: 120px; }
+  pre.out .p { color: var(--prompt); }
+  .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  .err { color: var(--warn); font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  tr.sel td { background: var(--chip1); } tbody tr { cursor: pointer; }
+  .chips { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 14px; }
+  .chips span { padding: 2px 4px; border-radius: 4px; white-space: pre; }
+  .chips span.cont { color: var(--muted); }
+  .chips span:nth-child(odd) { background: var(--chip1); } .chips span:nth-child(even) { background: var(--chip2); }
+  .chat { display: flex; flex-direction: column; gap: 10px; min-height: 160px; }
+  .msg { max-width: 80%; padding: 8px 12px; border-radius: 10px; white-space: pre-wrap; font-size: 14px; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); }
+  .msg.assistant { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); font-family: var(--mono); }
+  svg text { fill: var(--muted); font-size: 11px; }
+  .legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); }
+  .legend i { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 6px; }
+  pre.log { font-family: var(--mono); font-size: 12px; max-height: 260px; overflow: auto; margin: 0;
+            background: var(--bg); padding: 10px; border-radius: 6px; }
+  @media (max-width: 640px) { header, nav, main { padding-left: 16px; padding-right: 16px; } .msg { max-width: 95%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kyrie</h1>
+  <span class="meta" id="meta">connecting…</span>
+</header>
+<nav>
+  <button data-tab="play" class="on">Playground</button>
+  <button data-tab="chat">Chat</button>
+  <button data-tab="train">Training</button>
+  <button data-tab="tok">Tokenizer</button>
+</nav>
+<main>
+
+<section id="play" class="on">
+  <div class="panel">
+    <div class="row">
+      <label>Model <select id="p-run" class="run-select"></select></label>
+      <label>Temperature <span><input id="p-temp" type="range" min="0" max="1.5" step="0.05" value="0.8"> <b id="p-temp-v">0.8</b></span></label>
+      <label>Max tokens <input id="p-max" type="number" min="1" max="2000" value="150" style="width:90px"></label>
+      <label>Top-k <input id="p-topk" type="number" min="0" max="1000" value="50" style="width:80px"></label>
+    </div>
+    <p style="margin:14px 0 6px"><textarea id="p-prompt" rows="5" spellcheck="false">def is_prime(n):
+</textarea></p>
+    <div class="row">
+      <button class="act" id="p-go">Generate</button>
+      <button class="act ghost" id="p-stop" disabled>Stop</button>
+      <span class="err" id="p-err"></span>
+    </div>
+  </div>
+  <div class="panel"><pre class="out" id="p-out"><span class="hint">Output appears here, streamed as the model writes it.</span></pre></div>
+</section>
+
+<section id="chat">
+  <div class="panel">
+    <p class="hint" style="margin-top:0">Preview. Kyrie hasn't been instruction-tuned yet (that's step 4 of the plan), so it doesn't know how to answer questions.
+      This tab already wraps your messages in the chat format it will be trained on, so it will start making sense once that tuning is done.</p>
+    <div class="row"><label>Model <select id="c-run" class="run-select"></select></label>
+      <button class="act ghost" id="c-clear">Clear</button></div>
+  </div>
+  <div class="panel"><div class="chat" id="c-log"></div></div>
+  <div class="panel">
+    <div class="row" style="flex-wrap:nowrap">
+      <textarea id="c-in" rows="2" placeholder="Write a message…" style="flex:1"></textarea>
+      <button class="act" id="c-send">Send</button>
+    </div>
+    <span class="err" id="c-err"></span>
+  </div>
+</section>
+
+<section id="train">
+  <div class="panel">
+    <h3 style="margin:0 0 10px;font-size:16px">Runs</h3>
+    <table><thead><tr><th>Run</th><th>Size</th><th>Step</th><th>Train loss</th><th>Best val</th></tr></thead>
+      <tbody id="t-runs"></tbody></table>
+  </div>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0;font-size:16px" id="t-title">Loss</h3>
+      <div class="legend"><span><i style="background:var(--accent)"></i>train</span><span><i style="background:var(--warn)"></i>val</span></div>
+    </div>
+    <svg id="t-chart" viewBox="0 0 800 260" width="100%" preserveAspectRatio="none" role="img" aria-label="loss curve"></svg>
+  </div>
+  <div class="panel">
+    <h3 style="margin:0 0 10px;font-size:16px">Start a run</h3>
+    <div class="row">
+      <label>Preset <select id="t-preset"></select></label>
+      <label>Run name <input id="t-name" value="tiny-2" style="width:140px"></label>
+      <label>Steps <input id="t-steps" type="number" min="1" value="1000" style="width:100px"></label>
+      <label>Data <select id="t-data"></select></label>
+      <button class="act" id="t-start">Start</button>
+      <button class="act ghost" id="t-stop" disabled>Stop</button>
+    </div>
+    <p class="hint">Runs resume from their last checkpoint, so stopping loses at most a few hundred steps. On this Intel Mac only <b>tiny</b> is practical.</p>
+    <span class="err" id="t-err"></span>
+    <p class="hint" id="t-status"></p>
+    <pre class="log" id="t-log" hidden></pre>
+  </div>
+</section>
+
+<section id="tok">
+  <div class="panel">
+    <div class="row"><label>Tokenizer <select id="k-tok"></select></label></div>
+    <p style="margin:12px 0 6px"><textarea id="k-text" rows="4" spellcheck="false">def add(a, b):
+    return a + b
+
+ኢትዮጵያ በምሥራቅ አፍሪካ የምትገኝ ሀገር ናት።
+Afaan Oromoo afaan namoota miliyoona hedduun dubbatamu dha.</textarea></p>
+    <p class="hint" id="k-stats"></p>
+  </div>
+  <div class="panel"><div class="chips" id="k-chips"></div></div>
+</section>
+
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+const post = (path, body) => ({method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+
+// tabs, remembering the last one
+function show(tab) {
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  document.querySelectorAll("section").forEach((s) => s.classList.toggle("on", s.id === tab));
+  try { localStorage.setItem("kyrie-tab", tab); } catch (e) {}
+  if (tab === "tok") tokenize();
+}
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => show(b.dataset.tab));
+try { const t = localStorage.getItem("kyrie-tab"); if (t && $(t)) show(t); } catch (e) {}
+
+// ---- shared state ----
+let runs = [], selectedRun = null;
+
+async function loadInfo() {
+  const info = await api("/api/info");
+  $("meta").textContent = `${info.device.toUpperCase()} · torch ${info.torch}`;
+  $("t-preset").innerHTML = Object.entries(info.presets).map(([k, v]) =>
+    `<option value="${k}">${k} (${v.n_layers}×${v.d_model}, ctx ${v.seq_len})</option>`).join("");
+  $("t-data").innerHTML = info.datasets.map((d) =>
+    `<option value="${d.dir}">${d.dir} (${(d.train_tokens / 1e6).toFixed(1)}M tokens)</option>`).join("")
+    || `<option value="data/shards">data/shards</option>`;
+  $("k-tok").innerHTML = info.tokenizers.map((t) => `<option>${t}</option>`).join("")
+    || `<option>tokenizer/kyrie.json</option>`;
+}
+
+async function loadRuns() {
+  runs = await api("/api/runs");
+  const withCkpt = runs.filter((r) => r.has_checkpoint);
+  document.querySelectorAll(".run-select").forEach((sel) => {
+    const keep = sel.value;
+    sel.innerHTML = withCkpt.map((r) => `<option>${r.name}</option>`).join("") || "<option value=''>no trained models yet</option>";
+    // Default to the model with the lowest validation loss.
+    const best = withCkpt.filter((r) => r.best_val != null).sort((a, b) => a.best_val - b.best_val)[0];
+    if (withCkpt.some((r) => r.name === keep)) sel.value = keep;
+    else if (best) sel.value = best.name;
+  });
+  if (!selectedRun && runs.length) selectedRun = runs[0].name;
+  $("t-runs").innerHTML = runs.map((r) => `<tr class="${r.name === selectedRun ? "sel" : ""}" data-run="${r.name}">
+      <td>${esc(r.name)}</td><td>${r.model.n_layers || "?"}×${r.model.d_model || "?"}</td>
+      <td>${r.step}${r.max_steps ? " / " + r.max_steps : ""}</td>
+      <td>${r.loss != null ? r.loss.toFixed(3) : "–"}</td><td>${r.best_val != null ? r.best_val.toFixed(3) : "–"}</td></tr>`).join("")
+    || `<tr><td colspan="5" class="hint">No runs yet. Start one below.</td></tr>`;
+  document.querySelectorAll("#t-runs tr[data-run]").forEach((tr) => tr.onclick = () => { selectedRun = tr.dataset.run; loadRuns(); });
+  if (selectedRun) drawChart(selectedRun);
+}
+
+// ---- playground ----
+$("p-temp").oninput = () => $("p-temp-v").textContent = $("p-temp").value;
+let controller = null;
+async function streamInto(body, onText) {
+  controller = new AbortController();
+  const r = await fetch("/api/generate", {...post("/api/generate", body), signal: controller.signal});
+  if (!r.ok) throw new Error((await r.json()).error);
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  for (;;) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    onText(dec.decode(value, {stream: true}));
+  }
+}
+$("p-go").onclick = async () => {
+  const prompt = $("p-prompt").value;
+  $("p-err").textContent = ""; $("p-go").disabled = true; $("p-stop").disabled = false;
+  $("p-out").innerHTML = `<span class="p">${esc(prompt)}</span>`;
+  const gen = document.createElement("span"); $("p-out").appendChild(gen);
+  try {
+    await streamInto({run: $("p-run").value, prompt, temperature: +$("p-temp").value,
+                      max_new_tokens: +$("p-max").value, top_k: +$("p-topk").value},
+                     (t) => gen.textContent += t);
+  } catch (e) { if (e.name !== "AbortError") $("p-err").textContent = e.message; }
+  $("p-go").disabled = false; $("p-stop").disabled = true;
+};
+$("p-stop").onclick = () => controller && controller.abort();
+
+// ---- chat ----
+let messages = [];
+function renderChat() {
+  $("c-log").innerHTML = messages.map((m) => `<div class="msg ${m.role}">${esc(m.content) || "…"}</div>`).join("")
+    || `<p class="hint">Say hello. Expect nonsense for now.</p>`;
+}
+$("c-send").onclick = async () => {
+  const text = $("c-in").value.trim(); if (!text) return;
+  $("c-in").value = ""; $("c-err").textContent = "";
+  messages.push({role: "user", content: text});
+  const reply = {role: "assistant", content: ""}; messages.push(reply); renderChat();
+  $("c-send").disabled = true;
+  try {
+    await streamInto({run: $("c-run").value, mode: "chat", messages: messages.slice(0, -1),
+                      temperature: 0.7, max_new_tokens: 120},
+                     (t) => { reply.content += t; renderChat(); });
+  } catch (e) { $("c-err").textContent = e.message; }
+  $("c-send").disabled = false;
+};
+$("c-in").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("c-send").click(); } };
+$("c-clear").onclick = () => { messages = []; renderChat(); };
+renderChat();
+
+// ---- training ----
+async function drawChart(name) {
+  const log = await api(`/api/runs/${encodeURIComponent(name)}/log`);
+  $("t-title").textContent = `Loss: ${name}`;
+  const tr = log.filter((r) => r.loss != null), va = log.filter((r) => r.val_loss != null);
+  const svg = $("t-chart");
+  if (!tr.length) { svg.innerHTML = `<text x="400" y="130" text-anchor="middle">no log yet</text>`; return; }
+  const W = 800, H = 260, L = 44, B = 24, T = 10, R = 10;
+  const maxStep = Math.max(...tr.map((r) => r.step), ...va.map((r) => r.step));
+  const ys = [...tr.map((r) => r.loss), ...va.map((r) => r.val_loss)];
+  const lo = Math.floor(Math.min(...ys)), hi = Math.ceil(Math.max(...ys));
+  const x = (s) => L + (s / maxStep) * (W - L - R);
+  const y = (v) => T + (1 - (v - lo) / Math.max(1e-9, hi - lo)) * (H - T - B);
+  let g = "";
+  for (let v = lo; v <= hi; v++) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  g += `<text x="${W - R}" y="${H - 6}" text-anchor="end">step ${maxStep}</text><text x="${L}" y="${H - 6}">0</text>`;
+  g += `<polyline fill="none" stroke="var(--accent)" stroke-width="1.5" points="${tr.map((r) => `${x(r.step)},${y(r.loss)}`).join(" ")}"/>`;
+  if (va.length) g += `<polyline fill="none" stroke="var(--warn)" stroke-width="2" points="${va.map((r) => `${x(r.step)},${y(r.val_loss)}`).join(" ")}"/>`
+    + va.map((r) => `<circle cx="${x(r.step)}" cy="${y(r.val_loss)}" r="3" fill="var(--warn)"><title>step ${r.step}: ${r.val_loss}</title></circle>`).join("");
+  svg.innerHTML = g;
+}
+async function trainStatus() {
+  const s = await api("/api/train");
+  $("t-start").disabled = s.running; $("t-stop").disabled = !s.running;
+  $("t-status").textContent = s.running ? `Training ${s.run_name} (pid ${s.pid})…`
+    : s.run_name ? `Last run ${s.run_name} exited with code ${s.returncode}.` : "";
+  $("t-log").hidden = !s.log_tail.length; $("t-log").textContent = s.log_tail.join("\n");
+  $("t-log").scrollTop = $("t-log").scrollHeight;
+  return s.running;
+}
+$("t-start").onclick = async () => {
+  $("t-err").textContent = "";
+  try {
+    await api("/api/train", post("/api/train", {preset: $("t-preset").value, run_name: $("t-name").value.trim(),
+      max_steps: +$("t-steps").value, data_dir: $("t-data").value}));
+    selectedRun = $("t-name").value.trim();
+    poll();
+  } catch (e) { $("t-err").textContent = e.message; }
+};
+$("t-stop").onclick = async () => { await api("/api/train/stop", post("/api/train/stop", {})); trainStatus(); };
+async function poll() {
+  const running = await trainStatus().catch(() => false);
+  await loadRuns().catch(() => {});
+  if (running) setTimeout(poll, 3000);
+}
+
+// ---- tokenizer ----
+let tokTimer = null;
+async function tokenize() {
+  try {
+    const r = await api(`/api/tokenize?text=${encodeURIComponent($("k-text").value)}&tokenizer=${encodeURIComponent($("k-tok").value)}`);
+    $("k-stats").textContent = `${r.n_chars} characters → ${r.n_tokens} tokens (${(r.n_chars / Math.max(1, r.n_tokens)).toFixed(2)} chars per token)`;
+    $("k-chips").innerHTML = r.pieces.map((p) => p.cont
+      ? `<span class="cont" title="id ${p.id}: another byte of the character before">+</span>`
+      : `<span title="id ${p.id}">${esc(p.text.replace(/\n/g, "↵\n"))}</span>`).join("");
+  } catch (e) { $("k-stats").textContent = e.message; }
+}
+$("k-text").oninput = () => { clearTimeout(tokTimer); tokTimer = setTimeout(tokenize, 250); };
+$("k-tok").onchange = tokenize;
+
+loadInfo().then(poll).then(() => { if (document.querySelector("#tok.on")) tokenize(); })
+  .catch((e) => $("meta").textContent = "server error: " + e.message);
+</script>
+</body>
+</html>

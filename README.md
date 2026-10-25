@@ -18,6 +18,7 @@ The same code runs on an Apple Silicon Mac (MPS), on CPU, and on NVIDIA GPUs
 | `kyrie/train.py` | Training loop: grad accumulation, cosine LR, mixed precision, checkpoints, resume, DDP |
 | `kyrie/sample.py` | Generate from a checkpoint |
 | `kyrie/eval/humaneval.py` | HumanEval pass@k, running generated code in a subprocess with a timeout |
+| `kyrie/web/` | Local web interface: playground, chat preview, training dashboard, tokenizer |
 
 ## Presets
 
@@ -51,6 +52,24 @@ python -m kyrie.train --preset small --data_dir data/shards
 python -m kyrie.sample runs/small --prompt "def is_prime(n):" --num 3
 python -m kyrie.eval.humaneval runs/small --limit 20
 ```
+
+## Web interface
+
+```bash
+python -m kyrie.web          # then open http://127.0.0.1:7860
+```
+
+Run it from the repo folder. Four tabs:
+
+- **Playground**: pick a trained run and stream completions from a prompt.
+- **Chat**: a preview in the chat format the model will be instruction-tuned on (step 4),
+  so expect nonsense until then.
+- **Training**: every run under `runs/` with its loss curve, plus start and stop a
+  training job (one at a time; its output goes to `runs/<name>.log`).
+- **Tokenizer**: see how text splits into tokens and the chars-per-token ratio.
+
+It uses only the standard library and listens on 127.0.0.1 only, because it can start
+training jobs. It picks up new checkpoints automatically.
 
 Fully offline, any folder of `.py` files works as a source, e.g.
 `--source "dir:/path/to/some/python/projects"`.
