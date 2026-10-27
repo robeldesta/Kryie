@@ -94,3 +94,12 @@ def test_humaneval_harness():
     assert truncate("    return 1\ndef other():\n    pass") == "    return 1"
     assert pass_at_k(10, 0, 1) == 0.0 and pass_at_k(10, 10, 1) == 1.0
     assert abs(pass_at_k(10, 5, 1) - 0.5) < 1e-9
+
+
+def test_jsonl_source_keeps_multiline_documents(tmp_path):
+    from kyrie.sources import iter_source
+
+    path = tmp_path / "notices.jsonl"
+    path.write_text('{"text": "የመንገድ ጨረታ\\nline two"}\n\n{"notice": "other field"}\n', encoding="utf-8")
+    assert list(iter_source(f"jsonl:{path}")) == ["የመንገድ ጨረታ\nline two"]
+    assert list(iter_source(f"jsonl:{path}:notice")) == ["other field"]
