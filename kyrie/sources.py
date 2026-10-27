@@ -5,6 +5,7 @@ A source spec is a string:
     hf:<dataset>[:<config>]:<split>:<text_field>   stream a Hugging Face dataset
     dir:<path>[:<glob>]                            read local files (default glob **/*.py)
     file:<path>                                    one document per line of a text file
+    jsonl:<path>[:<field>]                         one JSON object per line, text in <field> (default "text")
 
 A mixture is a list of "weight@spec" entries; documents are drawn from each
 source in proportion to its weight.
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import glob
 import hashlib
+import json
 import os
 import random
 from typing import Iterator
@@ -70,6 +72,15 @@ def iter_source(spec: str, seed: int = 0) -> Iterator[str]:
                 line = line.strip()
                 if line:
                     yield line
+    elif kind == "jsonl":
+        # Multi-line documents, e.g. tender notices from Tender Watcher's export.
+        path, _, field = rest.partition(":")
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    text = json.loads(line).get(field or "text")
+                    if text:
+                        yield text
     else:
         raise ValueError(f"unknown source kind in {spec!r}")
 

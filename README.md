@@ -79,6 +79,9 @@ Defaults (change with `--source "weight@spec"`, repeatable):
 - Code: `codeparrot/codeparrot-clean` (Python from GitHub). For more languages and
   more tokens, `bigcode/the-stack-v2-dedup` or `bigcode/starcoderdata` (gated: accept
   the terms on Hugging Face and run `huggingface-cli login`).
+- Ethiopian tenders: Tender Watcher's `python -m tenderwatch.dataset export` writes
+  `notices.jsonl`; mix it in with `--source "0.1@jsonl:out/kyrie/notices.jsonl" --no_code_filter`.
+  Its `labeled.jsonl` holds human-checked fields for fine-tuning and evaluation later.
 - Tokenizer only, for now: Wikipedia in Amharic (`20231101.am`) and Afaan Oromo (`20231101.om`).
 
 ## Roadmap
